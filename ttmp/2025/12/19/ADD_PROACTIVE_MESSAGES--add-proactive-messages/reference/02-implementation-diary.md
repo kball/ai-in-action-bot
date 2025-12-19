@@ -9,12 +9,18 @@ DocType: reference
 Intent: long-term
 Owners: []
 RelatedFiles:
+    - Path: Dockerfile
+      Note: Updated to install dcron and use entrypoint (commit bb258db)
     - Path: api/proactive-internal.js
       Note: |-
         Created internal proactive router with placeholder endpoints (commit 547ef56)
         Updated to call actual job functions (commit ee57c1c)
     - Path: config/index.js
       Note: Added proactive messaging configuration (commit 547ef56)
+    - Path: crontab
+      Note: Added cron schedule for proactive jobs (commit bb258db)
+    - Path: docker-entrypoint.sh
+      Note: Created entrypoint to run cron and node (commit bb258db)
     - Path: lib/proactive/index.js
       Note: Created proactive module with job execution wrapper (commit ee57c1c)
     - Path: lib/proactive/jobs/talkReminders.js
@@ -33,6 +39,7 @@ ExternalSources: []
 Summary: Step-by-step implementation diary for proactive messaging feature
 LastUpdated: 2025-12-19T13:37:06.052438-08:00
 ---
+
 
 
 
@@ -166,3 +173,66 @@ This step implements the core proactive messaging functionality: talk reminders 
 - Reminder queries: `$or: [{ field: { $exists: false } }, { field: null }]` finds unsent reminders
 - Locking: in-memory Map keyed by job name, released in `finally` block
 - Delivery: try DM first, fallback to thread if DM fails and threadId exists
+
+## Step 3: Add Docker Cron Integration
+
+This step integrates system cron (dcron) into the Docker container to trigger proactive messaging jobs on a schedule. The entrypoint script starts both cron and Node.js, ensuring both processes run in the same container. Cron jobs call the internal HTTP endpoints via curl, keeping the scheduling logic separate from the application code.
+
+**Commit (code):** bb258db — "Phase 4: Add Docker cron integration for proactive messaging"
+
+### What I did
+- Updated `Dockerfile` to install `dcron` and `curl` packages
+- Created `docker-entrypoint.sh` to start `crond` in foreground alongside Node.js
+- Created `crontab` file with two scheduled jobs:
+  - Daily at 16:00 UTC: check reminders (handles both T-1 and day-of)
+  - Weekly on Mondays at 15:00 UTC: weekly announcement
+- Updated Dockerfile to copy crontab and entrypoint, set entrypoint
+
+### Why
+- Need scheduled execution of proactive messaging jobs
+- System cron is standard ops practice and easy to modify schedules
+- Cron triggers HTTP endpoints rather than running Node scripts directly
+- Keeps scheduling concerns separate from application logic
+
+### What worked
+- Entrypoint script runs cron in background (`&`) then execs main command
+- Cron jobs use `curl -fsS` with `|| true` to prevent cron errors from stopping execution
+- Crontab uses standard cron format for easy schedule modification
+
+### What didn't work
+- N/A (implementation completed successfully)
+
+### What I learned
+- Alpine Linux uses `dcron` (lightweight cron daemon)
+- Cron daemon needs to run in foreground (`-f`) to stay alive in container
+- Entrypoint script must use `exec "$@"` to replace shell with Node process (proper signal handling)
+
+### What was tricky to build
+- Ensuring cron logs reach container stdout/stderr (using `-l 2` flag for log level)
+- Entrypoint script must handle both cron startup and main process execution
+- Cron schedule times need to be in UTC (matches application's UTC date normalization)
+
+### What warrants a second pair of eyes
+- Entrypoint script - verify signal handling works correctly (SIGTERM to container should stop both processes)
+- Cron schedule times - confirm UTC times are appropriate for reminder delivery
+- Crontab file location - verify `/etc/crontabs/root` is correct for Alpine/dcron
+
+### What should be done in the future
+- Test container startup and verify both cron and Node processes run
+- Test cron job execution by manually triggering endpoints
+- Monitor cron logs in production to ensure jobs run as scheduled
+- Consider adding health check endpoint that verifies cron is running
+- Document cron schedule and how to modify it
+
+### Code review instructions
+- Start in `Dockerfile` - verify dcron installation and entrypoint setup
+- Check `docker-entrypoint.sh` - verify cron startup and exec usage
+- Review `crontab` - confirm schedule times and curl commands
+- Test: build container and verify both processes start
+- Test: manually trigger endpoints to verify cron can reach them
+
+### Technical details
+- Cron daemon: `crond -f -l 2` runs in foreground with log level 2
+- Entrypoint: `exec "$@"` replaces shell with Node process for proper signal handling
+- Cron schedule: `0 16 * * *` = daily at 16:00 UTC, `0 15 * * 1` = Mondays at 15:00 UTC
+- Curl flags: `-fsS` = fail silently, show errors, `|| true` prevents cron errors

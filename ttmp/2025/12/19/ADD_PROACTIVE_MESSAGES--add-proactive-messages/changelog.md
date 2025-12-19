@@ -52,3 +52,14 @@ Step 2: Implement proactive messaging jobs and extend schema (commit ee57c1c)
 - /Users/kball/git/ai-in-action-bot/lib/proactive/ — Created proactive module with jobs and locks
 - /Users/kball/git/ai-in-action-bot/models/scheduledSpeaker.js — Extended schema with reminders
 
+
+## 2025-12-19
+
+Step 3: Add Docker cron integration (commit bb258db)
+
+### Related Files
+
+- /Users/kball/git/ai-in-action-bot/Dockerfile — Added dcron and entrypoint
+- /Users/kball/git/ai-in-action-bot/crontab — Added cron schedule
+- /Users/kball/git/ai-in-action-bot/docker-entrypoint.sh — Created entrypoint script
+
