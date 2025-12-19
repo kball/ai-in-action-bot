@@ -41,3 +41,14 @@ Step 1: Add internal proactive router with security (commit 547ef56)
 - /Users/kball/git/ai-in-action-bot/middleware/loopback-only.js — Created security middleware
 - /Users/kball/git/ai-in-action-bot/server.js — Mounted router
 
+
+## 2025-12-19
+
+Step 2: Implement proactive messaging jobs and extend schema (commit ee57c1c)
+
+### Related Files
+
+- /Users/kball/git/ai-in-action-bot/api/proactive-internal.js — Connected to job functions
+- /Users/kball/git/ai-in-action-bot/lib/proactive/ — Created proactive module with jobs and locks
+- /Users/kball/git/ai-in-action-bot/models/scheduledSpeaker.js — Extended schema with reminders
+

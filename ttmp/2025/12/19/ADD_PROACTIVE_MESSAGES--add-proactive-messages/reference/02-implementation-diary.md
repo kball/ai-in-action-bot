@@ -10,17 +10,30 @@ Intent: long-term
 Owners: []
 RelatedFiles:
     - Path: api/proactive-internal.js
-      Note: Created internal proactive router with placeholder endpoints (commit 547ef56)
+      Note: |-
+        Created internal proactive router with placeholder endpoints (commit 547ef56)
+        Updated to call actual job functions (commit ee57c1c)
     - Path: config/index.js
       Note: Added proactive messaging configuration (commit 547ef56)
+    - Path: lib/proactive/index.js
+      Note: Created proactive module with job execution wrapper (commit ee57c1c)
+    - Path: lib/proactive/jobs/talkReminders.js
+      Note: Implemented talk reminders job (commit ee57c1c)
+    - Path: lib/proactive/jobs/weeklyAnnouncement.js
+      Note: Implemented weekly announcement job (commit ee57c1c)
+    - Path: lib/proactive/locks.js
+      Note: Created single-process locking utility (commit ee57c1c)
     - Path: middleware/loopback-only.js
       Note: Created loopback-only security middleware for internal endpoints (commit 547ef56)
+    - Path: models/scheduledSpeaker.js
+      Note: Extended schema with reminder sent timestamps (commit ee57c1c)
     - Path: server.js
       Note: Mounted proactive-internal router (commit 547ef56)
 ExternalSources: []
 Summary: Step-by-step implementation diary for proactive messaging feature
 LastUpdated: 2025-12-19T13:37:06.052438-08:00
 ---
+
 
 
 # Implementation Diary
@@ -86,3 +99,70 @@ This step establishes the foundation for proactive messaging by adding internal 
 - Endpoints return JSON with: `job`, `status`, `duration`, job-specific fields, `timestamp`
 - Security middleware checks `req.socket.remoteAddress` against loopback addresses
 - If `CRON_SECRET` env var is set, non-loopback requests can use `X-Cron-Secret` header
+
+## Step 2: Implement Proactive Messaging Jobs and Extend Schema
+
+This step implements the core proactive messaging functionality: talk reminders and weekly announcements. The implementation includes a locking mechanism to prevent overlapping job runs, date-based reminder selection logic, and DM delivery with thread fallback. The ScheduledSpeaker schema is extended to track reminder sent timestamps for idempotency.
+
+**Commit (code):** ee57c1c — "Phase 2: Implement proactive messaging jobs and extend schema"
+
+### What I did
+- Created `lib/proactive/locks.js` - single-process locking utility to prevent overlapping job runs
+- Created `lib/proactive/index.js` - main proactive module with job execution wrapper and locking
+- Created `lib/proactive/jobs/talkReminders.js` - talk reminders job that:
+  - Finds talks scheduled for tomorrow (T-1 reminder) and today (day-of reminder)
+  - Sends DMs to speakers, falls back to thread if DM fails
+  - Updates reminder sent timestamps only on successful send
+- Created `lib/proactive/jobs/weeklyAnnouncement.js` - weekly announcement job that posts upcoming schedule to configured channel
+- Extended `models/scheduledSpeaker.js` with `reminders.sentTminus1At` and `reminders.sentDayOfAt` fields
+- Updated `api/proactive-internal.js` to call actual job functions instead of placeholders
+
+### Why
+- Need actual job implementations to send reminders and announcements
+- Locking prevents race conditions if cron triggers overlap
+- Schema extension enables idempotency (only send reminders once per talk)
+- DM with thread fallback provides reliable delivery
+
+### What worked
+- Locking mechanism uses simple in-memory Map (sufficient for single-container deployment)
+- Date normalization to midnight UTC ensures consistent comparison
+- MongoDB queries use `$or` with `$exists` and `null` checks to handle both new and existing documents
+- Job results include detailed counts and error arrays for monitoring
+
+### What didn't work
+- N/A (implementation completed successfully)
+
+### What I learned
+- Mongoose schema updates are backward compatible - existing documents without `reminders` field are handled gracefully
+- Discord.js `client.users.fetch()` and `client.channels.fetch()` are async and can throw
+- Date normalization is critical for date-based queries (must use UTC midnight for consistency)
+
+### What was tricky to build
+- Date normalization logic - ensuring talks stored at midnight UTC are compared correctly
+- MongoDB query for "not sent yet" - need to check both `$exists: false` and `null` values
+- Error handling in reminder delivery - need to catch both DM and thread send failures separately
+
+### What warrants a second pair of eyes
+- Date normalization logic - verify it works correctly across timezones and edge cases
+- MongoDB query patterns - confirm `$or` with `$exists` and `null` handles all cases correctly
+- Locking mechanism - verify it prevents overlapping runs effectively (consider adding lock timeout)
+
+### What should be done in the future
+- Add unit tests for date normalization functions
+- Add unit tests for reminder selection queries (mock MongoDB)
+- Add integration tests for job execution with mocked Discord client
+- Consider adding lock timeout to prevent stuck locks if job crashes
+- For multi-instance deployments, replace in-memory locks with distributed lock (MongoDB-based)
+
+### Code review instructions
+- Start in `lib/proactive/jobs/talkReminders.js` - verify reminder selection and delivery logic
+- Check `lib/proactive/locks.js` - verify locking mechanism
+- Review `models/scheduledSpeaker.js` - confirm schema extension
+- Test reminder job: create test talks with dates, verify queries and delivery
+- Test weekly announcement: verify channel fetch and message formatting
+
+### Technical details
+- Date normalization: `new Date(Date.UTC(year, month, date))` ensures midnight UTC
+- Reminder queries: `$or: [{ field: { $exists: false } }, { field: null }]` finds unsent reminders
+- Locking: in-memory Map keyed by job name, released in `finally` block
+- Delivery: try DM first, fallback to thread if DM fails and threadId exists
