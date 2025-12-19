@@ -254,20 +254,22 @@ async function main() {
       console.log(channelMessages[0].content)
     }
 
-    // Test 2b: Weekly Announcement with no talks (CTA test)
+    // Test 2b: Weekly Announcement with no talks THIS WEEK but talks later (CTA test)
     console.log(
-      '\n\n\x1b[1mTest 2b: Weekly Announcement with No Talks (CTA)\x1b[0m',
+      '\n\n\x1b[1mTest 2b: Weekly Announcement with No Talks This Week (CTA)\x1b[0m',
     )
     console.log('─'.repeat(50))
 
-    // Delete all upcoming talks to test empty schedule
+    // Delete talks from this week but keep future talks
+    const endOfWeek = new Date(today)
+    endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 7)
     await ScheduledSpeaker.deleteMany({
-      scheduledDate: { $gte: today },
+      scheduledDate: { $gte: today, $lt: endOfWeek },
       talkCompleted: { $ne: true },
     })
     client.clearMessages()
 
-    console.log('\nRunning weekly announcement job (no talks)...')
+    console.log('\nRunning weekly announcement job (no talks this week, but talks later)...')
     const weeklyResultEmpty = await proactive.runWeeklyAnnouncement(client)
 
     console.log('\nResults:')
@@ -282,6 +284,39 @@ async function main() {
       console.log('\nAnnouncement content (should include CTA):')
       console.log(emptyChannelMessages[0].content)
       if (emptyChannelMessages[0].content.includes('volunteer')) {
+        console.log('\n✓ CTA for volunteers found!')
+      }
+      if (emptyChannelMessages[0].content.includes('No talks scheduled for this week')) {
+        console.log('\n✓ Correctly identifies no talks THIS WEEK')
+      }
+    }
+
+    // Test 2c: Weekly Announcement with no talks at all (CTA test)
+    console.log(
+      '\n\n\x1b[1mTest 2c: Weekly Announcement with No Talks At All (CTA)\x1b[0m',
+    )
+    console.log('─'.repeat(50))
+
+    // Delete all talks
+    await ScheduledSpeaker.deleteMany({
+      scheduledDate: { $gte: today },
+      talkCompleted: { $ne: true },
+    })
+    client.clearMessages()
+
+    console.log('\nRunning weekly announcement job (no talks at all)...')
+    const weeklyResultNoTalks = await proactive.runWeeklyAnnouncement(client)
+
+    console.log('\nResults:')
+    console.log(JSON.stringify(weeklyResultNoTalks, null, 2))
+
+    // Verify channel message was sent with CTA
+    const noTalksMessages = client.getChannelMessages('announcements-channel')
+    console.log(`\n✓ Channel messages: ${noTalksMessages.length}`)
+    if (noTalksMessages.length > 0) {
+      console.log('\nAnnouncement content (should include CTA):')
+      console.log(noTalksMessages[0].content)
+      if (noTalksMessages[0].content.includes('volunteer')) {
         console.log('\n✓ CTA for volunteers found!')
       }
     }
