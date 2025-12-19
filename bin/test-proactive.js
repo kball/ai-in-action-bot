@@ -1,0 +1,267 @@
+#!/usr/bin/env node
+/* Test proactive messaging using the chat simulation client (no Discord required). */
+const { ChatClient } = require('../lib/chat-sim/client')
+const { User } = require('../lib/chat-sim/entities')
+const config = require('../config')
+const proactive = require('../lib/proactive')
+
+// Ensure DB connects
+require('../lib/mongo')
+
+// Extend ChatClient to support proactive messaging methods
+class ProactiveTestClient extends ChatClient {
+  constructor(options) {
+    super(options)
+    // Track DMs sent to users
+    this.dmMessages = new Map()
+    // Track channel messages
+    this.channelMessages = new Map()
+
+    // Store original channels Map
+    this._channelsMap = this.channels
+
+    // Add channels.fetch method for Discord.js compatibility
+    this.channels.fetch = async (channelId) => {
+      // Check if it's a known channel
+      let channel = this._channelsMap.get(channelId)
+      if (channel) {
+        // Override send to track messages if not already done
+        if (!channel._sendTracked) {
+          const originalSend = channel.send.bind(channel)
+          channel.send = async (content) => {
+            if (!this.channelMessages.has(channelId)) {
+              this.channelMessages.set(channelId, [])
+            }
+            this.channelMessages.get(channelId).push({
+              content,
+              timestamp: new Date(),
+            })
+            console.log(`\x1b[36m[Channel #${channel.name}]\x1b[0m\n${content}`)
+            return originalSend(content)
+          }
+          channel._sendTracked = true
+        }
+        return channel
+      }
+      // Create a virtual channel for announcements if it doesn't exist
+      const virtualChannel = this.createTextChannel({
+        id: channelId,
+        name: 'announcements',
+      })
+      // Override send to track messages
+      const originalSend = virtualChannel.send.bind(virtualChannel)
+      virtualChannel.send = async (content) => {
+        if (!this.channelMessages.has(channelId)) {
+          this.channelMessages.set(channelId, [])
+        }
+        this.channelMessages.get(channelId).push({
+          content,
+          timestamp: new Date(),
+        })
+        console.log(`\x1b[36m[Channel #announcements]\x1b[0m\n${content}`)
+        return originalSend(content)
+      }
+      virtualChannel._sendTracked = true
+      return virtualChannel
+    }
+  }
+
+  // Override users.fetch to return User with send() method for DMs
+  get users() {
+    const self = this
+    return {
+      fetch: async (userId) => {
+        const user = await super.users.fetch(userId)
+        // Add send method for DMs
+        if (!user.send) {
+          user.send = async (content) => {
+            if (!self.dmMessages.has(userId)) {
+              self.dmMessages.set(userId, [])
+            }
+            self.dmMessages.get(userId).push({
+              content,
+              timestamp: new Date(),
+            })
+            console.log(`\x1b[35m[DM to @${user.username}]\x1b[0m ${content}`)
+            return { id: `dm-${Date.now()}`, content }
+          }
+        }
+        return user
+      },
+    }
+  }
+
+  // Helper to get all DMs sent to a user
+  getDMsForUser(userId) {
+    return this.dmMessages.get(userId) || []
+  }
+
+  // Helper to get all messages sent to a channel
+  getChannelMessages(channelId) {
+    return this.channelMessages.get(channelId) || []
+  }
+
+  // Helper to clear all messages (for testing)
+  clearMessages() {
+    this.dmMessages.clear()
+    this.channelMessages.clear()
+  }
+}
+
+async function main() {
+  const guildId = (config.discord && config.discord.guildId) || 'guild-1'
+  const client = new ProactiveTestClient({
+    guildId,
+    botId: 'bot-1',
+    botName: 'bot',
+  })
+
+  // Create test users
+  const testUser1 = client.ensureUser('alice')
+  const testUser2 = client.ensureUser('bob')
+
+  console.log(
+    '\x1b[1m=== Proactive Messaging Test (No Discord Required)\x1b[0m\n',
+  )
+  console.log(
+    'Using chat simulation client to test proactive messaging jobs.\n',
+  )
+
+  // Set up config for testing
+  const originalRemindersEnabled = config.proactive.remindersEnabled
+  const originalWeeklyEnabled = config.proactive.weeklyEnabled
+  const originalChannelId = config.proactive.announcementsChannelId
+
+  config.proactive.remindersEnabled = true
+  config.proactive.weeklyEnabled = true
+  config.proactive.announcementsChannelId = 'announcements-channel'
+
+  try {
+    // Test 1: Talk Reminders Job
+    console.log('\x1b[1mTest 1: Talk Reminders Job\x1b[0m')
+    console.log('─'.repeat(50))
+
+    const ScheduledSpeaker = require('../models/scheduledSpeaker')
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+
+    // Create test talks
+    console.log('\nCreating test talks...')
+    const talk1 = await ScheduledSpeaker.create({
+      discordUserId: testUser1.id,
+      discordUsername: testUser1.username,
+      topic: 'Test Talk for Tomorrow',
+      scheduledDate: tomorrow,
+      threadId: 'thread-123',
+    })
+    console.log(
+      `✓ Created talk: "${talk1.topic}" scheduled for ${tomorrow.toISOString().split('T')[0]}`,
+    )
+
+    const talk2 = await ScheduledSpeaker.create({
+      discordUserId: testUser2.id,
+      discordUsername: testUser2.username,
+      topic: 'Test Talk for Today',
+      scheduledDate: today,
+      threadId: 'thread-456',
+    })
+    console.log(
+      `✓ Created talk: "${talk2.topic}" scheduled for ${today.toISOString().split('T')[0]}`,
+    )
+
+    // Run reminders job
+    console.log('\nRunning reminders job...')
+    const remindersResult = await proactive.runTalkReminders(client)
+
+    console.log('\nResults:')
+    console.log(JSON.stringify(remindersResult, null, 2))
+
+    // Verify DMs were sent
+    console.log('\n✓ DMs sent:')
+    const aliceDMs = client.getDMsForUser(testUser1.id)
+    const bobDMs = client.getDMsForUser(testUser2.id)
+    console.log(`  - @${testUser1.username}: ${aliceDMs.length} DM(s)`)
+    console.log(`  - @${testUser2.username}: ${bobDMs.length} DM(s)`)
+
+    // Test idempotency
+    console.log('\nTesting idempotency (running job again)...')
+    const remindersResult2 = await proactive.runTalkReminders(client)
+    console.log(
+      `✓ Reminders sent: ${remindersResult2.reminders.tminus1Sent + remindersResult2.reminders.dayOfSent} (should be 0)`,
+    )
+
+    // Test 2: Weekly Announcement Job
+    console.log('\n\n\x1b[1mTest 2: Weekly Announcement Job\x1b[0m')
+    console.log('─'.repeat(50))
+
+    // Create additional upcoming talks
+    const nextWeek = new Date(today)
+    nextWeek.setUTCDate(nextWeek.getUTCDate() + 7)
+    await ScheduledSpeaker.create({
+      discordUserId: testUser1.id,
+      discordUsername: testUser1.username,
+      topic: 'Talk Next Week',
+      scheduledDate: nextWeek,
+    })
+
+    console.log('\nRunning weekly announcement job...')
+    const weeklyResult = await proactive.runWeeklyAnnouncement(client)
+
+    console.log('\nResults:')
+    console.log(JSON.stringify(weeklyResult, null, 2))
+
+    // Verify channel message was sent
+    const channelMessages = client.getChannelMessages('announcements-channel')
+    console.log(`\n✓ Channel messages: ${channelMessages.length}`)
+    if (channelMessages.length > 0) {
+      console.log('\nAnnouncement content:')
+      console.log(channelMessages[0].content)
+    }
+
+    // Test 3: Disabled Features
+    console.log('\n\n\x1b[1mTest 3: Disabled Features\x1b[0m')
+    console.log('─'.repeat(50))
+
+    config.proactive.remindersEnabled = false
+    config.proactive.weeklyEnabled = false
+
+    const disabledReminders = await proactive.runTalkReminders(client)
+    const disabledWeekly = await proactive.runWeeklyAnnouncement(client)
+
+    console.log('\nReminders (disabled):')
+    console.log(JSON.stringify(disabledReminders, null, 2))
+    console.log('\nWeekly (disabled):')
+    console.log(JSON.stringify(disabledWeekly, null, 2))
+
+    // Cleanup
+    console.log('\n\n\x1b[1mCleanup\x1b[0m')
+    console.log('─'.repeat(50))
+    await ScheduledSpeaker.deleteMany({
+      topic: {
+        $in: [
+          'Test Talk for Tomorrow',
+          'Test Talk for Today',
+          'Talk Next Week',
+        ],
+      },
+    })
+    console.log('✓ Test talks deleted')
+
+    console.log('\n\x1b[32m✓ All tests completed!\x1b[0m\n')
+  } catch (error) {
+    console.error('\n\x1b[31m✗ Error:\x1b[0m', error)
+    process.exit(1)
+  } finally {
+    // Restore original config
+    config.proactive.remindersEnabled = originalRemindersEnabled
+    config.proactive.weeklyEnabled = originalWeeklyEnabled
+    config.proactive.announcementsChannelId = originalChannelId
+  }
+}
+
+main().catch((error) => {
+  console.error('Fatal error:', error)
+  process.exit(1)
+})

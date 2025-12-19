@@ -57,6 +57,38 @@ This guide covers how to test the proactive messaging feature end-to-end, from l
 
 ## Testing Approach
 
+### Phase 0: Quick Test with REPL (No Discord Required) ⚡
+
+The easiest way to test proactive messaging without setting up Discord is using the REPL test script. This uses the chat simulation client to test all functionality.
+
+```bash
+# Run the test script (no Discord token needed!)
+npm run test-proactive
+# or directly:
+node bin/test-proactive.js
+```
+
+**What it tests:**
+- ✅ Talk reminders job (T-1 and day-of)
+- ✅ Weekly announcement job
+- ✅ Idempotency (no duplicate sends)
+- ✅ Disabled features handling
+- ✅ DM and channel message sending
+
+**What you'll see:**
+- Test talks created in MongoDB
+- DMs "sent" to simulated users (printed to console)
+- Channel announcements "posted" (printed to console)
+- Job results with counts and status
+- Automatic cleanup of test data
+
+**Prerequisites:**
+- MongoDB running (uses your `MONGO_URI`)
+- No Discord token needed!
+- Environment variables optional (script sets them for testing)
+
+This is the fastest way to verify the proactive messaging logic works correctly before testing with real Discord.
+
 ### Phase 1: Local Testing (Without Docker)
 
 Test the endpoints and job logic locally before containerizing.
