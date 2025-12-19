@@ -1,10 +1,11 @@
 const test = require('tape')
-const mongoose = require('../../../lib/mongo')
-const ScheduledSpeaker = require('../../../models/scheduledSpeaker')
+const mongoose = require('../../../../lib/mongo')
+const ScheduledSpeaker = require('../../../../models/scheduledSpeaker')
+const GuildSettings = require('../../../../models/guildSettings')
 const {
   runWeeklyAnnouncementJob,
-} = require('../../../lib/proactive/jobs/weeklyAnnouncement')
-const config = require('../../../config')
+} = require('../../../../lib/proactive/jobs/weeklyAnnouncement')
+const config = require('../../../../config')
 
 // Mock Discord client
 function createMockDiscordClient() {
@@ -57,13 +58,26 @@ test('weekly announcement - shows CTA when no talks this week but talks exist la
   // Mock config
   const originalEnabled = config.proactive.weeklyEnabled
   const originalChannelId = config.proactive.announcementsChannelId
+  const originalGuildId = config.discord.guildId
   config.proactive.weeklyEnabled = true
-  config.proactive.announcementsChannelId = 'announcements-channel'
+  config.proactive.announcementsChannelId = null // Use MongoDB instead
+  config.discord.guildId = 'test-guild-123'
+
+  // Set up MongoDB channel config
+  await GuildSettings.deleteMany({})
+  await GuildSettings.create({
+    guildId: 'test-guild-123',
+    proactiveAnnouncementsChannelId: 'announcements-channel',
+  })
 
   const result = await runWeeklyAnnouncementJob(client)
 
   t.equal(result.announcement.posted, true)
-  t.equal(result.announcement.talksCount, 0, 'Should find 0 talks for this week')
+  t.equal(
+    result.announcement.talksCount,
+    0,
+    'Should find 0 talks for this week',
+  )
 
   // Verify message contains CTA
   const messages = client.getChannelMessages('announcements-channel')
@@ -79,8 +93,10 @@ test('weekly announcement - shows CTA when no talks this week but talks exist la
 
   // Cleanup
   await ScheduledSpeaker.deleteMany({})
+  await GuildSettings.deleteMany({})
   config.proactive.weeklyEnabled = originalEnabled
   config.proactive.announcementsChannelId = originalChannelId
+  config.discord.guildId = originalGuildId
   t.end()
 })
 
@@ -105,8 +121,17 @@ test('weekly announcement - shows talks when talks exist this week', async (t) =
   // Mock config
   const originalEnabled = config.proactive.weeklyEnabled
   const originalChannelId = config.proactive.announcementsChannelId
+  const originalGuildId = config.discord.guildId
   config.proactive.weeklyEnabled = true
-  config.proactive.announcementsChannelId = 'announcements-channel'
+  config.proactive.announcementsChannelId = null // Use MongoDB instead
+  config.discord.guildId = 'test-guild-123'
+
+  // Set up MongoDB channel config
+  await GuildSettings.deleteMany({})
+  await GuildSettings.create({
+    guildId: 'test-guild-123',
+    proactiveAnnouncementsChannelId: 'announcements-channel',
+  })
 
   const result = await runWeeklyAnnouncementJob(client)
 
@@ -131,8 +156,10 @@ test('weekly announcement - shows talks when talks exist this week', async (t) =
 
   // Cleanup
   await ScheduledSpeaker.deleteMany({})
+  await GuildSettings.deleteMany({})
   config.proactive.weeklyEnabled = originalEnabled
   config.proactive.announcementsChannelId = originalChannelId
+  config.discord.guildId = originalGuildId
   t.end()
 })
 
@@ -144,8 +171,17 @@ test('weekly announcement - shows CTA when no talks at all', async (t) => {
   // Mock config
   const originalEnabled = config.proactive.weeklyEnabled
   const originalChannelId = config.proactive.announcementsChannelId
+  const originalGuildId = config.discord.guildId
   config.proactive.weeklyEnabled = true
-  config.proactive.announcementsChannelId = 'announcements-channel'
+  config.proactive.announcementsChannelId = null // Use MongoDB instead
+  config.discord.guildId = 'test-guild-123'
+
+  // Set up MongoDB channel config
+  await GuildSettings.deleteMany({})
+  await GuildSettings.create({
+    guildId: 'test-guild-123',
+    proactiveAnnouncementsChannelId: 'announcements-channel',
+  })
 
   const result = await runWeeklyAnnouncementJob(client)
 
@@ -162,7 +198,72 @@ test('weekly announcement - shows CTA when no talks at all', async (t) => {
 
   // Cleanup
   await ScheduledSpeaker.deleteMany({})
+  await GuildSettings.deleteMany({})
   config.proactive.weeklyEnabled = originalEnabled
   config.proactive.announcementsChannelId = originalChannelId
+  config.discord.guildId = originalGuildId
+  t.end()
+})
+
+test('weekly announcement - handles missing MongoDB configuration with fallback to config', async (t) => {
+  await ScheduledSpeaker.deleteMany({})
+  await GuildSettings.deleteMany({})
+
+  const client = createMockDiscordClient()
+
+  // Mock config with fallback channel ID
+  const originalEnabled = config.proactive.weeklyEnabled
+  const originalChannelId = config.proactive.announcementsChannelId
+  const originalGuildId = config.discord.guildId
+  config.proactive.weeklyEnabled = true
+  config.proactive.announcementsChannelId = 'fallback-channel-id'
+  config.discord.guildId = 'test-guild-no-mongo'
+
+  // No MongoDB config set - should use fallback
+  const result = await runWeeklyAnnouncementJob(client)
+
+  t.equal(result.announcement.posted, true)
+  t.equal(result.announcement.talksCount, 0)
+
+  // Verify message posted to fallback channel
+  const messages = client.getChannelMessages('fallback-channel-id')
+  t.equal(messages.length, 1)
+
+  // Cleanup
+  await ScheduledSpeaker.deleteMany({})
+  await GuildSettings.deleteMany({})
+  config.proactive.weeklyEnabled = originalEnabled
+  config.proactive.announcementsChannelId = originalChannelId
+  config.discord.guildId = originalGuildId
+  t.end()
+})
+
+test('weekly announcement - handles missing configuration', async (t) => {
+  await ScheduledSpeaker.deleteMany({})
+  await GuildSettings.deleteMany({})
+
+  const client = createMockDiscordClient()
+
+  // Mock config with no channel ID
+  const originalEnabled = config.proactive.weeklyEnabled
+  const originalChannelId = config.proactive.announcementsChannelId
+  const originalGuildId = config.discord.guildId
+  config.proactive.weeklyEnabled = true
+  config.proactive.announcementsChannelId = null
+  config.discord.guildId = 'test-guild-no-config'
+
+  // No MongoDB config and no fallback
+  const result = await runWeeklyAnnouncementJob(client)
+
+  t.equal(result.announcement.posted, false)
+  t.ok(result.announcement.error.includes('not configured'))
+  t.ok(result.announcement.error.includes('/set-proactive-channel'))
+
+  // Cleanup
+  await ScheduledSpeaker.deleteMany({})
+  await GuildSettings.deleteMany({})
+  config.proactive.weeklyEnabled = originalEnabled
+  config.proactive.announcementsChannelId = originalChannelId
+  config.discord.guildId = originalGuildId
   t.end()
 })
