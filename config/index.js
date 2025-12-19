@@ -31,6 +31,12 @@ const config = {
   zoomLink: process.env.ZOOM_LINK,
   zoomPassword: process.env.ZOOM_PASSWORD,
   whitelist: (process.env.WHITELIST || defaults.whitelist.join(',')).split(','),
+  proactive: {
+    remindersEnabled: process.env.PROACTIVE_REMINDERS_ENABLED === 'true',
+    weeklyEnabled: process.env.PROACTIVE_WEEKLY_ENABLED === 'true',
+    announcementsChannelId: process.env.PROACTIVE_ANNOUNCEMENTS_CHANNEL_ID,
+    cronSecret: process.env.CRON_SECRET,
+  },
 }
 
 // Configure logging based on environment
