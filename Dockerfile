@@ -26,6 +26,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
+# Enable proactive messaging by default
+ENV PROACTIVE_REMINDERS_ENABLED=true
+ENV PROACTIVE_WEEKLY_ENABLED=true
 
 # Expose the port the app runs on
 EXPOSE ${PORT}

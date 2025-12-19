@@ -58,8 +58,7 @@ test('guildSettings - unique constraint on guildId', async (t) => {
     t.fail('Should have thrown error for duplicate guildId')
   } catch (err) {
     t.ok(
-      err.message.includes('duplicate key') ||
-        err.message.includes('E11000'),
+      err.message.includes('duplicate key') || err.message.includes('E11000'),
       'Should throw duplicate key error',
     )
   }

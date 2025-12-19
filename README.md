@@ -78,8 +78,6 @@ This is a Discord bot designed to facilitate scheduling and potentially other AI
     # Proactive messaging (optional)
     PROACTIVE_REMINDERS_ENABLED=true
     PROACTIVE_WEEKLY_ENABLED=true
-    # PROACTIVE_ANNOUNCEMENTS_CHANNEL_ID is deprecated - use /set-proactive-channel command instead
-    # PROACTIVE_ANNOUNCEMENTS_CHANNEL_ID=your_channel_id_here  # Fallback only
     CRON_SECRET=optional_secret_for_multi_instance_deployments
     ```
 

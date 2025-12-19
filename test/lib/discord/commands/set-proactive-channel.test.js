@@ -141,7 +141,9 @@ test('set-proactive-channel - handles channel not found', async (t) => {
   t.equal(result.ephemeral, true)
 
   // Verify NOT saved in MongoDB
-  const settings = await GuildSettings.findOne({ guildId: 'guild-notfound-test' })
+  const settings = await GuildSettings.findOne({
+    guildId: 'guild-notfound-test',
+  })
   t.equal(settings, null)
 
   await GuildSettings.deleteMany({})

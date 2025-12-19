@@ -45,7 +45,7 @@ Examples:
 ## Proactive Messaging
 - **Architecture**: Docker cron (`dcron`) triggers localhost HTTP endpoints (`/internal/proactive/*`) that run jobs using the existing Discord client. Jobs are in `lib/proactive/jobs/` (talk reminders, weekly announcements).
 - **Jobs**: `lib/proactive/jobs/talkReminders.js` sends T-1 day and day-of reminders via DM (with thread fallback). `lib/proactive/jobs/weeklyAnnouncement.js` posts weekly schedule to configured channel. Both jobs are idempotent (track sent timestamps in `ScheduledSpeaker.reminders`).
-- **Channel Configuration**: Use `/set-proactive-channel` Discord command to configure the announcements channel. Configuration is stored in MongoDB (`GuildSettings` model) for runtime updates without container restarts. Falls back to `PROACTIVE_ANNOUNCEMENTS_CHANNEL_ID` env var for backward compatibility.
+- **Channel Configuration**: Use `/set-proactive-channel` Discord command to configure the announcements channel. Configuration is stored in MongoDB (`GuildSettings` model) for runtime updates without container restarts.
 - **Security**: Internal endpoints secured by `middleware/loopback-only.js` (allows loopback IPs, optional `X-Cron-Secret` header). Tests: `test/middleware/loopback-only.test.js` verifies IPv4/IPv6 loopback, rejects non-loopback without secret, allows non-loopback with valid secret.
 - **Testing**: Unit tests in `test/lib/proactive/jobs/` verify job logic, idempotency, date normalization, and fallback behavior. Endpoint tests in `test/api/proactive-internal.test.js` verify security and job invocation. Use `bin/test-proactive.js` for REPL-based testing without Discord (creates test talks, runs jobs, verifies results).
 - **Docker**: `Dockerfile` installs `dcron`; `docker-entrypoint.sh` starts cron alongside Node; `crontab` schedules jobs (daily reminders at 16:00 UTC, weekly announcements Mondays at 15:00 UTC).
@@ -70,6 +70,6 @@ Examples:
 
 ## Security & Configuration
 - Never commit secrets. Use `.env` (see `.env.example`). Required keys live in `config/index.js` (e.g., `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID`, `OPENROUTER_API_KEY`, `MONGO_URI`).
-- **Proactive messaging config**: Optional env vars `PROACTIVE_REMINDERS_ENABLED`, `PROACTIVE_WEEKLY_ENABLED`, `PROACTIVE_ANNOUNCEMENTS_CHANNEL_ID` (deprecated - use `/set-proactive-channel` command instead), `CRON_SECRET`. See `config/index.js` for defaults. Channel configuration is stored in MongoDB via `/set-proactive-channel` command, with env var fallback for backward compatibility.
+- **Proactive messaging config**: Optional env vars `PROACTIVE_REMINDERS_ENABLED`, `PROACTIVE_WEEKLY_ENABLED`, `CRON_SECRET`. See `config/index.js` for defaults. Channel configuration is stored in MongoDB via `/set-proactive-channel` command.
 - Validate configs at startup and prefer mocking in tests.
 - **Internal endpoints**: Routes under `/internal/proactive/*` are secured with loopback-only middleware (`middleware/loopback-only.js`). Tests verify security in `test/middleware/loopback-only.test.js` and `test/api/proactive-internal.test.js`.

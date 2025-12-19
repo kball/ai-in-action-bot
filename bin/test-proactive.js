@@ -5,6 +5,7 @@ const { ChatClient } = require('../lib/chat-sim/client')
 const { User } = require('../lib/chat-sim/entities')
 const config = require('../config')
 const proactive = require('../lib/proactive')
+const GuildSettings = require('../models/guildSettings')
 
 // Connect to MongoDB directly (avoid deasync dependency)
 async function connectMongo() {
@@ -161,11 +162,18 @@ async function main() {
   // Set up config for testing
   const originalRemindersEnabled = config.proactive.remindersEnabled
   const originalWeeklyEnabled = config.proactive.weeklyEnabled
-  const originalChannelId = config.proactive.announcementsChannelId
+  const originalGuildId = config.discord.guildId
 
   config.proactive.remindersEnabled = true
   config.proactive.weeklyEnabled = true
-  config.proactive.announcementsChannelId = 'announcements-channel'
+  config.discord.guildId = guildId
+
+  // Set up MongoDB channel configuration
+  await GuildSettings.deleteMany({})
+  await GuildSettings.create({
+    guildId,
+    proactiveAnnouncementsChannelId: 'announcements-channel',
+  })
 
   try {
     // Test 1: Talk Reminders Job
@@ -383,10 +391,13 @@ async function main() {
     console.error('\n\x1b[31m✗ Error:\x1b[0m', error)
     process.exit(1)
   } finally {
+    // Cleanup GuildSettings
+    await GuildSettings.deleteMany({})
+
     // Restore original config
     config.proactive.remindersEnabled = originalRemindersEnabled
     config.proactive.weeklyEnabled = originalWeeklyEnabled
-    config.proactive.announcementsChannelId = originalChannelId
+    config.discord.guildId = originalGuildId
 
     // Close MongoDB connection
     await mongoose.connection.close()
