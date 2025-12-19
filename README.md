@@ -36,7 +36,11 @@ This is a Discord bot designed to facilitate scheduling and potentially other AI
 ├── package.json        # Project dependencies and scripts
 ├── package-lock.json   # Exact dependency versions
 ├── server.js           # Web server setup (Express)
-└── test/               # Automated tests
+├── test/               # Automated tests
+└── ttmp/               # Structured documentation managed by docmgr
+    ├── _templates/     # Document templates
+    ├── _guidelines/     # Writing guidelines
+    └── YYYY/MM/DD/     # Ticket workspaces organized by date
 ```
 
 ## Getting Started
@@ -145,6 +149,54 @@ To verify proactive messaging manually:
 3. Verify DMs sent and reminder timestamps updated in MongoDB
 4. Test idempotency by running the job again (should send 0 reminders)
 
+## Documentation Management (docmgr)
+
+This project uses [docmgr](https://github.com/dguttman/docmgr) to manage structured documentation in the `ttmp/` directory. Documentation is organized into ticket workspaces, each containing design docs, reference materials, playbooks, and implementation diaries.
+
+### Common docmgr Commands
+
+- **Create a ticket workspace:**
+  ```bash
+  docmgr ticket create-ticket --ticket TICKET-ID --title "Ticket Title" --topics topic1,topic2
+  ```
+
+- **Add a document to a ticket:**
+  ```bash
+  docmgr doc add --ticket TICKET-ID --doc-type design-doc --title "Design Document Title"
+  ```
+
+- **Relate files to a document:**
+  ```bash
+  docmgr doc relate --doc ttmp/.../reference/01-diary.md --file-note "/abs/path/to/file.js:Why this file matters"
+  ```
+
+- **Update changelog:**
+  ```bash
+  docmgr changelog update --ticket TICKET-ID --entry "What changed" --file-note "/path/to/file.js:Reason"
+  ```
+
+- **List tickets:**
+  ```bash
+  docmgr ticket tickets
+  ```
+
+- **Get help:**
+  ```bash
+  docmgr help how-to-use
+  ```
+
+### Documentation Structure
+
+Each ticket workspace (`ttmp/YYYY/MM/DD/TICKET-ID--slug/`) contains:
+- `index.md` - Ticket overview and entry point
+- `tasks.md` - Task list
+- `changelog.md` - History of changes
+- `design-doc/` - Design documents and architecture notes
+- `reference/` - Implementation diaries, API contracts, quick reference
+- `playbook/` - Operational procedures and testing guides
+
+Documentation uses frontmatter metadata for searchability and bidirectional code-to-doc linking.
+
 ## Contributing
 
-Please refer to the documentation in the `docs/` directory for contribution guidelines, specifications, and tutorials. 
+Please refer to the documentation in the `docs/` directory for contribution guidelines, specifications, and tutorials. For ticket-based work, use docmgr to create and manage documentation workspaces. 

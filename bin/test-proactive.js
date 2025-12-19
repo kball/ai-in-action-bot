@@ -269,7 +269,9 @@ async function main() {
     })
     client.clearMessages()
 
-    console.log('\nRunning weekly announcement job (no talks this week, but talks later)...')
+    console.log(
+      '\nRunning weekly announcement job (no talks this week, but talks later)...',
+    )
     const weeklyResultEmpty = await proactive.runWeeklyAnnouncement(client)
 
     console.log('\nResults:')
@@ -286,7 +288,11 @@ async function main() {
       if (emptyChannelMessages[0].content.includes('volunteer')) {
         console.log('\n✓ CTA for volunteers found!')
       }
-      if (emptyChannelMessages[0].content.includes('No talks scheduled for this week')) {
+      if (
+        emptyChannelMessages[0].content.includes(
+          'No talks scheduled for this week',
+        )
+      ) {
         console.log('\n✓ Correctly identifies no talks THIS WEEK')
       }
     }

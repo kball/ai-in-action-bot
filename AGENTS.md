@@ -8,6 +8,7 @@
 - `config/` loads environment from `.env` and exports typed config.
 - `test/` contains Tape tests (`**/*.test.js`), plus helpers and mocks.
 - `docs/` holds additional documentation; `Dockerfile` builds a runnable image.
+- `ttmp/` contains structured documentation managed by docmgr (ticket workspaces, design docs, implementation diaries).
 
 ## Build, Test, and Development Commands
 - `npm start` — Deploys Discord commands then runs the app (`index.js`).
@@ -53,6 +54,19 @@ Examples:
 - Commits: short, imperative subject; reference issues/PRs when relevant (e.g., "Update help message (#23)").
 - PRs must include: concise description, linked issues, test coverage notes, local run steps, and screenshots/logs for Discord flows when applicable.
 - Ensure `npm test` and `npm run lint` pass; if commands change, update README and `package.json` scripts.
+
+## Documentation Management (docmgr)
+- **Purpose**: Structured documentation in `ttmp/` organized by tickets with metadata, bidirectional code-to-doc linking, and searchability.
+- **Workflow**: Use docmgr commands to create tickets, add documents, relate files, and update changelogs. Write document content in markdown with frontmatter metadata.
+- **Common commands**:
+  - `docmgr ticket create-ticket` - Create new ticket workspace
+  - `docmgr doc add --ticket TICKET --doc-type TYPE --title "Title"` - Add document
+  - `docmgr doc relate --doc PATH --file-note "/abs/path:Note"` - Link code files to docs
+  - `docmgr changelog update --ticket TICKET --entry "Entry"` - Update changelog
+  - `docmgr help how-to-use` - Full usage guide
+- **Document types**: `design-doc`, `reference`, `playbook`, `tutorial`, `code-review`, etc.
+- **Implementation diaries**: Use `reference` doc type for step-by-step implementation narratives. Follow diary format guidelines in `ttmp/_guidelines/reference.md`.
+- **File relationships**: Always use absolute paths in `--file-note` for code-to-doc linking.
 
 ## Security & Configuration
 - Never commit secrets. Use `.env` (see `.env.example`). Required keys live in `config/index.js` (e.g., `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID`, `OPENROUTER_API_KEY`, `MONGO_URI`).
