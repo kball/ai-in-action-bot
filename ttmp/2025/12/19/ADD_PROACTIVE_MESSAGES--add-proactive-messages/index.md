@@ -1,7 +1,7 @@
 ---
 Title: Add Proactive Messages
 Ticket: ADD_PROACTIVE_MESSAGES
-Status: active
+Status: complete
 Topics:
     - discord
     - bot
@@ -10,9 +10,10 @@ Intent: long-term
 Owners: []
 RelatedFiles: []
 ExternalSources: []
-Summary: "Add proactive messaging capabilities to the Discord bot"
-LastUpdated: 2025-12-19T13:06:01.837793-08:00
+Summary: Add proactive messaging capabilities to the Discord bot
+LastUpdated: 2025-12-19T14:09:04.369865-08:00
 ---
+
 
 # Add Proactive Messages
 

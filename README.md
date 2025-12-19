@@ -151,7 +151,7 @@ To verify proactive messaging manually:
 
 ## Documentation Management (docmgr)
 
-This project uses [docmgr](https://github.com/dguttman/docmgr) to manage structured documentation in the `ttmp/` directory. Documentation is organized into ticket workspaces, each containing design docs, reference materials, playbooks, and implementation diaries.
+This project sometimes uses [docmgr](https://github.com/go-go-golems/docmgr) to manage structured documentation in the `ttmp/` directory. Documentation is organized into ticket workspaces, each containing design docs, reference materials, playbooks, and implementation diaries.
 
 ### Common docmgr Commands
 
