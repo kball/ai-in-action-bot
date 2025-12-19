@@ -1,12 +1,21 @@
 #!/usr/bin/env node
 /* Test proactive messaging using the chat simulation client (no Discord required). */
+const mongoose = require('mongoose')
 const { ChatClient } = require('../lib/chat-sim/client')
 const { User } = require('../lib/chat-sim/entities')
 const config = require('../config')
 const proactive = require('../lib/proactive')
 
-// Ensure DB connects
-require('../lib/mongo')
+// Connect to MongoDB directly (avoid deasync dependency)
+async function connectMongo() {
+  try {
+    await mongoose.connect(config.mongoUri)
+    console.log('✓ Connected to MongoDB')
+  } catch (error) {
+    console.error('MongoDB connection error:', error)
+    process.exit(1)
+  }
+}
 
 // Extend ChatClient to support proactive messaging methods
 class ProactiveTestClient extends ChatClient {
@@ -20,75 +29,90 @@ class ProactiveTestClient extends ChatClient {
     // Store original channels Map
     this._channelsMap = this.channels
 
-    // Add channels.fetch method for Discord.js compatibility
-    this.channels.fetch = async (channelId) => {
-      // Check if it's a known channel
-      let channel = this._channelsMap.get(channelId)
-      if (channel) {
-        // Override send to track messages if not already done
-        if (!channel._sendTracked) {
-          const originalSend = channel.send.bind(channel)
-          channel.send = async (content) => {
-            if (!this.channelMessages.has(channelId)) {
-              this.channelMessages.set(channelId, [])
+    // Override users getter to add send() method for DMs
+    const self = this
+    Object.defineProperty(this, 'users', {
+      get() {
+        return {
+          fetch: async (userId) => {
+            const user = await self._users.get(userId)
+            if (!user) {
+              throw new Error(`User ${userId} not found`)
             }
-            this.channelMessages.get(channelId).push({
+            // Add send method for DMs if not already added
+            if (!user.send) {
+              user.send = async (content) => {
+                if (!self.dmMessages.has(userId)) {
+                  self.dmMessages.set(userId, [])
+                }
+                self.dmMessages.get(userId).push({
+                  content,
+                  timestamp: new Date(),
+                })
+                console.log(`\x1b[35m[DM to @${user.username}]\x1b[0m ${content}`)
+                return { id: `dm-${Date.now()}`, content }
+              }
+            }
+            return user
+          },
+        }
+      },
+      configurable: true,
+    })
+
+    // Add channels.fetch method for Discord.js compatibility
+    const channelsMap = this._channelsMap
+    Object.defineProperty(this, 'channels', {
+      get() {
+        const self = this
+        const fetchMethod = async (channelId) => {
+          // Check if it's a known channel
+          let channel = channelsMap.get(channelId)
+          if (channel) {
+            // Override send to track messages if not already done
+            if (!channel._sendTracked) {
+              const originalSend = channel.send.bind(channel)
+              channel.send = async (content) => {
+                if (!self.channelMessages.has(channelId)) {
+                  self.channelMessages.set(channelId, [])
+                }
+                self.channelMessages.get(channelId).push({
+                  content,
+                  timestamp: new Date(),
+                })
+                console.log(`\x1b[36m[Channel #${channel.name}]\x1b[0m\n${content}`)
+                return originalSend(content)
+              }
+              channel._sendTracked = true
+            }
+            return channel
+          }
+          // Create a virtual channel for announcements if it doesn't exist
+          const virtualChannel = self.createTextChannel({
+            id: channelId,
+            name: 'announcements',
+          })
+          // Override send to track messages
+          const originalSend = virtualChannel.send.bind(virtualChannel)
+          virtualChannel.send = async (content) => {
+            if (!self.channelMessages.has(channelId)) {
+              self.channelMessages.set(channelId, [])
+            }
+            self.channelMessages.get(channelId).push({
               content,
               timestamp: new Date(),
             })
-            console.log(`\x1b[36m[Channel #${channel.name}]\x1b[0m\n${content}`)
+            console.log(`\x1b[36m[Channel #announcements]\x1b[0m\n${content}`)
             return originalSend(content)
           }
-          channel._sendTracked = true
+          virtualChannel._sendTracked = true
+          return virtualChannel
         }
-        return channel
-      }
-      // Create a virtual channel for announcements if it doesn't exist
-      const virtualChannel = this.createTextChannel({
-        id: channelId,
-        name: 'announcements',
-      })
-      // Override send to track messages
-      const originalSend = virtualChannel.send.bind(virtualChannel)
-      virtualChannel.send = async (content) => {
-        if (!this.channelMessages.has(channelId)) {
-          this.channelMessages.set(channelId, [])
-        }
-        this.channelMessages.get(channelId).push({
-          content,
-          timestamp: new Date(),
-        })
-        console.log(`\x1b[36m[Channel #announcements]\x1b[0m\n${content}`)
-        return originalSend(content)
-      }
-      virtualChannel._sendTracked = true
-      return virtualChannel
-    }
-  }
-
-  // Override users.fetch to return User with send() method for DMs
-  get users() {
-    const self = this
-    return {
-      fetch: async (userId) => {
-        const user = await super.users.fetch(userId)
-        // Add send method for DMs
-        if (!user.send) {
-          user.send = async (content) => {
-            if (!self.dmMessages.has(userId)) {
-              self.dmMessages.set(userId, [])
-            }
-            self.dmMessages.get(userId).push({
-              content,
-              timestamp: new Date(),
-            })
-            console.log(`\x1b[35m[DM to @${user.username}]\x1b[0m ${content}`)
-            return { id: `dm-${Date.now()}`, content }
-          }
-        }
-        return user
+        // Return object that has both Map methods and fetch
+        return Object.assign(channelsMap, { fetch: fetchMethod })
       },
-    }
+      configurable: true,
+    })
   }
 
   // Helper to get all DMs sent to a user
@@ -109,6 +133,9 @@ class ProactiveTestClient extends ChatClient {
 }
 
 async function main() {
+  // Connect to MongoDB first
+  await connectMongo()
+
   const guildId = (config.discord && config.discord.guildId) || 'guild-1'
   const client = new ProactiveTestClient({
     guildId,
@@ -258,6 +285,10 @@ async function main() {
     config.proactive.remindersEnabled = originalRemindersEnabled
     config.proactive.weeklyEnabled = originalWeeklyEnabled
     config.proactive.announcementsChannelId = originalChannelId
+    
+    // Close MongoDB connection
+    await mongoose.connection.close()
+    console.log('✓ MongoDB connection closed')
   }
 }
 
