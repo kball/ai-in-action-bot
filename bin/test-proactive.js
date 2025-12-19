@@ -49,7 +49,9 @@ class ProactiveTestClient extends ChatClient {
                   content,
                   timestamp: new Date(),
                 })
-                console.log(`\x1b[35m[DM to @${user.username}]\x1b[0m ${content}`)
+                console.log(
+                  `\x1b[35m[DM to @${user.username}]\x1b[0m ${content}`,
+                )
                 return { id: `dm-${Date.now()}`, content }
               }
             }
@@ -80,7 +82,9 @@ class ProactiveTestClient extends ChatClient {
                   content,
                   timestamp: new Date(),
                 })
-                console.log(`\x1b[36m[Channel #${channel.name}]\x1b[0m\n${content}`)
+                console.log(
+                  `\x1b[36m[Channel #${channel.name}]\x1b[0m\n${content}`,
+                )
                 return originalSend(content)
               }
               channel._sendTracked = true
@@ -223,6 +227,9 @@ async function main() {
     console.log('\n\n\x1b[1mTest 2: Weekly Announcement Job\x1b[0m')
     console.log('─'.repeat(50))
 
+    // Clear previous channel messages
+    client.clearMessages()
+
     // Create additional upcoming talks
     const nextWeek = new Date(today)
     nextWeek.setUTCDate(nextWeek.getUTCDate() + 7)
@@ -233,7 +240,7 @@ async function main() {
       scheduledDate: nextWeek,
     })
 
-    console.log('\nRunning weekly announcement job...')
+    console.log('\nRunning weekly announcement job (with talks)...')
     const weeklyResult = await proactive.runWeeklyAnnouncement(client)
 
     console.log('\nResults:')
@@ -246,6 +253,60 @@ async function main() {
       console.log('\nAnnouncement content:')
       console.log(channelMessages[0].content)
     }
+
+    // Test 2b: Weekly Announcement with no talks (CTA test)
+    console.log(
+      '\n\n\x1b[1mTest 2b: Weekly Announcement with No Talks (CTA)\x1b[0m',
+    )
+    console.log('─'.repeat(50))
+
+    // Delete all upcoming talks to test empty schedule
+    await ScheduledSpeaker.deleteMany({
+      scheduledDate: { $gte: today },
+      talkCompleted: { $ne: true },
+    })
+    client.clearMessages()
+
+    console.log('\nRunning weekly announcement job (no talks)...')
+    const weeklyResultEmpty = await proactive.runWeeklyAnnouncement(client)
+
+    console.log('\nResults:')
+    console.log(JSON.stringify(weeklyResultEmpty, null, 2))
+
+    // Verify channel message was sent with CTA
+    const emptyChannelMessages = client.getChannelMessages(
+      'announcements-channel',
+    )
+    console.log(`\n✓ Channel messages: ${emptyChannelMessages.length}`)
+    if (emptyChannelMessages.length > 0) {
+      console.log('\nAnnouncement content (should include CTA):')
+      console.log(emptyChannelMessages[0].content)
+      if (emptyChannelMessages[0].content.includes('volunteer')) {
+        console.log('\n✓ CTA for volunteers found!')
+      }
+    }
+
+    // Recreate talks for remaining tests
+    await ScheduledSpeaker.create({
+      discordUserId: testUser1.id,
+      discordUsername: testUser1.username,
+      topic: 'Test Talk for Tomorrow',
+      scheduledDate: tomorrow,
+      threadId: 'thread-123',
+    })
+    await ScheduledSpeaker.create({
+      discordUserId: testUser2.id,
+      discordUsername: testUser2.username,
+      topic: 'Test Talk for Today',
+      scheduledDate: today,
+      threadId: 'thread-456',
+    })
+    await ScheduledSpeaker.create({
+      discordUserId: testUser1.id,
+      discordUsername: testUser1.username,
+      topic: 'Talk Next Week',
+      scheduledDate: nextWeek,
+    })
 
     // Test 3: Disabled Features
     console.log('\n\n\x1b[1mTest 3: Disabled Features\x1b[0m')
@@ -285,7 +346,7 @@ async function main() {
     config.proactive.remindersEnabled = originalRemindersEnabled
     config.proactive.weeklyEnabled = originalWeeklyEnabled
     config.proactive.announcementsChannelId = originalChannelId
-    
+
     // Close MongoDB connection
     await mongoose.connection.close()
     console.log('✓ MongoDB connection closed')
