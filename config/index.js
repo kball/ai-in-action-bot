@@ -34,6 +34,8 @@ const config = {
   proactive: {
     remindersEnabled: process.env.PROACTIVE_REMINDERS_ENABLED === 'true',
     weeklyEnabled: process.env.PROACTIVE_WEEKLY_ENABLED === 'true',
+    // Deprecated: Use /set-proactive-channel Discord command instead
+    // Kept for backward compatibility - MongoDB lookup takes precedence
     announcementsChannelId: process.env.PROACTIVE_ANNOUNCEMENTS_CHANNEL_ID,
     cronSecret: process.env.CRON_SECRET,
   },
