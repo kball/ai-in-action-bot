@@ -1,12 +1,8 @@
 const express = require('express')
 const router = express.Router()
 const autoCatch = require('../lib/auto-catch')
-const loopbackOnly = require('../middleware/loopback-only')
 const proactive = require('../lib/proactive')
 const discordClient = require('../lib/discord')
-
-// Apply loopback-only security to all routes in this router
-router.use(loopbackOnly)
 
 /**
  * POST /internal/proactive/check-reminders
