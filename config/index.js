@@ -32,8 +32,8 @@ const config = {
   zoomPassword: process.env.ZOOM_PASSWORD,
   whitelist: (process.env.WHITELIST || defaults.whitelist.join(',')).split(','),
   proactive: {
-    remindersEnabled: process.env.PROACTIVE_REMINDERS_ENABLED === 'true',
-    weeklyEnabled: process.env.PROACTIVE_WEEKLY_ENABLED === 'true',
+    remindersEnabled: true
+    weeklyEnabled: true
     cronSecret: process.env.CRON_SECRET,
   },
 }

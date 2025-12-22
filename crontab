@@ -6,4 +6,4 @@
 0 16 * * * curl -fsS -X POST http://127.0.0.1:3000/internal/proactive/check-reminders || true
 
 # Weekly announcement: run every Monday at 15:00 UTC
-0 15 * * 1 curl -fsS -X POST http://127.0.0.1:3000/internal/proactive/weekly-announcement || true
+0 18 * * 1 curl -fsS -X POST http://127.0.0.1:3000/internal/proactive/weekly-announcement || true
