@@ -77,3 +77,17 @@ Step 4: Add unit tests for proactive messaging (commit 1c3f28d)
 
 Ticket closed
 
+
+## 2025-12-22
+
+Created design doc for interval-based scheduler migration to replace cron-based approach
+
+
+## 2025-12-22
+
+Implemented interval-based scheduler replacing cron-based approach: added lib/proactive/scheduler.js, updated config with schedule options, integrated with Discord client ready handler, added graceful shutdown, removed docker-entrypoint.sh and crontab, simplified Dockerfile
+
+### Related Files
+
+- /Users/kball/git/ai-in-action-bot/lib/proactive/scheduler.js — New interval-based proactive scheduler class
+

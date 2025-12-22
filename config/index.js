@@ -35,6 +35,14 @@ const config = {
     remindersEnabled: true,
     weeklyEnabled: true,
     cronSecret: process.env.CRON_SECRET,
+    // Schedule times (UTC)
+    remindersHour: 16, // 8AM Pacific
+    remindersMinute: 0,
+    weeklyHour: 17, // 9AM Pacific
+    weeklyMinute: 0,
+    weeklyDayOfWeek: 1, // Monday
+    // Interval check frequency (60 seconds)
+    checkIntervalMs: 60000,
   },
 }
 

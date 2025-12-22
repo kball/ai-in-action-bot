@@ -1,10 +1,10 @@
 const test = require('tape')
-const mongoose = require('../../../lib/mongo')
-const ScheduledSpeaker = require('../../../models/scheduledSpeaker')
+const mongoose = require('../../../../lib/mongo')
+const ScheduledSpeaker = require('../../../../models/scheduledSpeaker')
 const {
   runTalkRemindersJob,
-} = require('../../../lib/proactive/jobs/talkReminders')
-const config = require('../../../config')
+} = require('../../../../lib/proactive/jobs/talkReminders')
+const config = require('../../../../config')
 
 // Mock Discord client
 function createMockDiscordClient() {
